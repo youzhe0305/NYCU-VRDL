@@ -1,0 +1,46 @@
+# Dataset & raw data
+data/
+*.tar
+*.tar.gz
+*.zip
+
+# Model checkpoints (large binary files)
+checkpoints/
+
+# Training & evaluation logs
+log/
+history/
+HW1/run.log
+HW1/eval.log
+
+# Intermediate prediction files (keep only final)
+HW1/prediction[1-9].csv
+HW1/prediction.csv
+
+# Report generation scripts & source docs (not needed for reproducibility)
+HW1/generate_report.py
+HW1/generate_report_en.py
+HW1/report.docx
+HW1/report_en.docx
+HW1/program.md
+
+# Python cache
+__pycache__/
+HW1/__pycache__/
+*.py[cod]
+
+# Claude Code
+.claude/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# others
+HW1/vote.py
+.flake8

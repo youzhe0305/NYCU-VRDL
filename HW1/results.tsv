@@ -1,0 +1,31 @@
+timestep	val_acc	memory_gb	status	description
+20260325_230349	0.863300	16.7	keep	baseline: ResNet152 full fine-tune, dropout=0.5, lr=1e-3/backbone_lr=1e-5, bs=96, cosine LR, label_smooth=0.15
+20260326_001032	0.863300	16.7	discard	MixUp alpha=0.2: ties baseline but adds complexity
+20260326_011707	0.873300	16.7	keep	TrivialAugmentWide replaces manual augmentation chain (+0.010)
+20260326_092743	0.880000	14.7	keep	img_size=256 batch_size=64: larger input resolution (+0.007 vs prev best)
+20260326_103221	0.903300	14.7	keep	CutMix p=0.5 alpha=1.0: strong regularization (+0.023 vs prev best)
+20260326_113507	0.896700	14.7	discard	backbone_lr=1e-4: peaked early (epoch 26) then degraded
+20260326_123941	0.910000	14.7	keep	dropout=0.3 (was 0.5): less over-regularization with CutMix (+0.007)
+20260326_134257	0.900000	14.7	discard	T_max=45: LR decays too fast, hurts mid-run learning
+20260326_144704	0.893300	14.1	discard	img_size=288 bs=48: only ~35 epochs in budget, too few to converge
+20260326_165012	0.896700	14.7	discard	no RandomErasing: hurt performance, RandomErasing complements CutMix
+20260326_165315	0.906700	15.0	discard	SWA epochs 35-47: averaged post-peak decline phase, SWA≤single checkpoint
+20260326_175737	0.900000	14.7	discard	CutMix p=0.7: over-regularizes, train_acc ~0.80 vs 0.86 at p=0.5
+20260326_190049	0.906700	14.7	discard	label_smoothing=0.05: no improvement, 0.15 is better with CutMix
+20260326_200409	0.893300	14.7	discard	2-layer head 2048->512->100: worse than single linear, simple head is better
+20260327_011458	0.890000	7.2	    discard	ResNet50 (vs ResNet152): more epochs (96) but lower capacity, peaked at epoch 14 then plateaued
+20260327_021711	0.890000	14.7	discard	warmup(5ep)+cosine: fewer effective epochs, warmup overhead hurts
+20260327_032009	0.870000	14.7	discard	backbone_weight_decay=1e-4 (was 1e-3): more forgetting of pretrained features, worse
+20260327_042229	0.880000	14.7	discard	crop scale=(0.08,1.0): too aggressive, small patches confuse model (+0 vs best)
+20260327_052544	0.873300	14.7	discard	MixUp(25%)+CutMix(25%)+plain(50%): diluted CutMix effect, worse than CutMix alone
+20260327_062850	0.020000	14.9	crash	EMA (per-epoch update, decay=0.9997): bug - EMA was 98.6% initial weights after 47 epochs
+20260327_073042	0.716700	14.9	crash	EMA per-batch (decay=0.9997): bug - BN running stats not updated via state_dict
+20260327_083432	0.883300	14.9	discard	EMA per-batch state_dict (decay=0.9997): averaging smooths out peak, worse than single best ckpt
+20260327_093905	0.873300	14.7	discard	dropout=0.1: over-fits without sufficient head regularization
+20260327_125819	0.923300	6.2	keep	img_size=448 bs=16: larger input resolution (+0.013 vs prev best); evaluate.py called with --img_size 448
+20260327_140953	0.930000	11.7	keep	bs=32 lr=5e-4 backbone_lr=5e-5: peak at epoch 21 (vs ep6 before) more stable convergence (+0.007)
+20260327_141034	0.923300	17.0	discard	bs=48: peaked ep11 then plateaued, same epoch count as bs=32 (data-load bottleneck), worse than bs=32
+20260327_151517	0.930000	11.7	discard	epochs=35 (T_max=35): LR fully exhausted by ep29, low-LR fine-tuning gave no gain, same 0.930 ceiling
+20260327_161842	0.926700	11.7	discard	backbone_lr=1e-4: too aggressive, noisy training, peaked ep22 at 0.9267 < 0.930
+20260327_172209	0.926700	11.7	discard	RandAugment(2,9) vs TrivialAugmentWide: more ops but worse, TrivialAugmentWide has better diversity
+20260327_192804	0.933300	12.0	keep	GeM pooling (p=3, learnable) replaces AvgPool: focuses on discriminative features (+0.003)

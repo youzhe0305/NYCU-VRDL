@@ -1,0 +1,18 @@
+# Training hyperparameters
+data_dir: data
+save_dir: checkpoints
+log_dir: log
+
+epochs: 60
+batch_size: 32
+lr: 5e-4
+backbone_lr: 5e-5
+weight_decay: 1e-4          # head (classifier) weight decay
+backbone_weight_decay: 1e-3  # backbone weight decay (可獨立調整)
+dropout: 0.3
+label_smoothing: 0.15
+
+num_classes: 100
+num_workers: 4
+img_size: 448
+include_original: false
