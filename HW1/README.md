@@ -128,6 +128,10 @@ ResNet152 (fully fine-tuned, pretrained on ImageNet-1K V2)
 | Best Epoch          | 23                 |
 | Total Parameters    | ~58.3M             |
 
+Leaderboard Screenshot:
+![Leaderboard Screenshot](leaderboard_screenshot.png)
+
+
 ## File Structure
 
 ```
