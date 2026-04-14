@@ -1,4 +1,7 @@
-# Image Classification with ResNet152 and GeM Pooling
+# NYCU VRDL 2026 HW1 - Image Classification with ResNet
+
+* Student ID: 112550069
+* Name: You Zhe, Xie
 
 100-class image classification using a fully fine-tuned ResNet152 backbone. Built for the Visual Recognition HW1 competition.
 
