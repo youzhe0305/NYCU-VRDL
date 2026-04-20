@@ -22,12 +22,22 @@ This project tackles multi-digit detection in street-view images. The approach a
 
 ## Environment Setup
 
-**Python** >= 3.9
+**Python** 3.9 | **CUDA** 12.x (tested with torch 2.8.0 + CUDA 12.8)
 
-Install dependencies:
+**Step 1 — Install PyTorch** (choose the wheel matching your CUDA version):
 
 ```bash
-pip install torch torchvision scipy
+# CUDA 12.x
+pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128
+
+# CPU only
+pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu
+```
+
+**Step 2 — Install remaining dependencies:**
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## Dataset Structure
@@ -155,6 +165,9 @@ ResNet-50 (pretrained, fully fine-tuned)
 | + Higher resolution                 | 0.4386          |
 | + Full spatial/pixel augmentation   | **0.4611**      |
 
+Leaderboard Screenshot:
+![Leaderboard Screenshot](leaderboard_screenshot.png)
+
 Training curves:
 
 ![Training curves (initial trained weight)](training_curves.png)
@@ -175,6 +188,7 @@ HW2/
 │   └── nms_ensemble.py     # NMS / Soft-NMS ensemble
 ├── log_DINO/
 │   └── merge_logs.py       # Merge multi-stage training logs for plotting
+├── requirements.txt        # Python dependencies
 ├── README.md               # Intorduction to this project
 ├── report.pdf              # Detailed method, result, ablation study
 └── (114-2) HW2 Slides.pdf  # Project spec

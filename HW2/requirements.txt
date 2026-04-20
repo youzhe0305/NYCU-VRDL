@@ -1,0 +1,12 @@
+# Install PyTorch separately first — pick the wheel matching your CUDA version:
+#   CUDA 12.x:  pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128
+#   CPU only:   pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu
+
+torch==2.8.0
+torchvision==0.23.0
+scipy==1.13.1
+numpy==2.0.2
+Pillow==11.3.0
+PyYAML==6.0.3
+tqdm==4.67.3
+matplotlib==3.9.4
