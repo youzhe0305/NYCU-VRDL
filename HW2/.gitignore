@@ -39,3 +39,6 @@ archive/
 
 # Misc
 *.tmp
+
+# Submission folder
+submit/
