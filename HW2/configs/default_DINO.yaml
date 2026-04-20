@@ -1,0 +1,95 @@
+# -----------------------------------------------------------------------
+# HW2 — DINO Digit Detection  (configs/default_DINO.yaml)
+# -----------------------------------------------------------------------
+
+# Data
+data_dir: nycu-hw2-data
+save_dir: checkpoints_DINO
+log_dir: log_DINO
+max_side: 900
+min_side: 600
+train_scales: [600]  # scale jitter: short side is randomly sampled from this list each iteration; use a single value e.g. [480] to disable jitter
+
+# Training
+device: cuda:0
+epochs: 200
+batch_size: 8
+lr: 1.0e-4
+backbone_lr: 1.0e-5
+weight_decay: 1.0e-4
+dropout: 0.1
+num_workers: 16
+grad_accum: 1
+max_norm: 0.1
+lr_scheduler: cosine   # "cosine" or "multistep"
+
+# Model — DINO architecture
+num_classes: 10
+num_queries: 10
+d_model: 256
+nhead: 8
+num_encoder_layers: 3
+num_decoder_layers: 3
+dim_feedforward: 2048
+n_levels: 3            # multi-scale feature levels (C3, C4, C5, C6)
+n_points: 4            # deformable attention sampling points per head per level
+use_aff: false         # Adaptive Feature Fusion (AFF) — learnable spatial attention per level before fusion
+aff_kernel_size: 3     # kernel size for AFF attention convolution
+
+# Contrastive DeNoising
+dn_number: 10
+dn_label_noise_ratio: 0.5
+dn_box_noise_scale: 0.4
+
+# Loss weights
+lambda_cls: 1.0
+lambda_bbox: 5.0
+lambda_giou: 2.0
+
+# Auxiliary loss switches (all full-training, no decay)
+use_aux_loss: false     # decoder intermediate-layer deep supervision
+use_enc_loss: false     # encoder auxiliary head
+use_dn_loss: true      # contrastive denoising loss (requires dn_number > 0)
+lambda_aux: 1.0        # weight on summed decoder aux losses
+lambda_enc: 1.0        # weight on encoder aux loss
+lambda_dn:  1.0        # weight on DN loss
+
+# Augmentation — pixel (image only)
+aug_color_jitter: true
+aug_color_jitter_brightness: 0.4
+aug_color_jitter_contrast: 0.4
+aug_color_jitter_saturation: 0.4
+aug_color_jitter_hue: 0.1
+
+aug_sharpness: false
+aug_sharpness_p: 0.3
+aug_sharpness_factor: 2.0
+
+aug_gaussian_blur: true
+aug_gaussian_blur_p: 0.2
+aug_gaussian_blur_sigma_min: 0.1
+aug_gaussian_blur_sigma_max: 2.0
+
+aug_iso_noise: true
+aug_iso_noise_p: 0.2
+aug_iso_noise_intensity: 0.05
+
+# Augmentation — spatial (image + bboxes)
+aug_translation: true
+aug_translation_p: 0.3
+aug_translation_max_shift: 0.1        # fraction of image size
+aug_translation_min_area_ratio: 0.25  # drop bbox if remaining area < ratio * original
+
+aug_random_crop: true
+aug_random_crop_p: 0.5
+aug_random_crop_min_scale: 0.5        # crop width/height = uniform(min, max) * image size
+aug_random_crop_max_scale: 1.0
+aug_random_crop_min_overlap: 0.5      # keep bbox if intersection/bbox_area >= this
+
+aug_random_expand: true
+aug_random_expand_p: 0.3
+aug_random_expand_max_ratio: 2.0      # canvas = uniform(1, max_ratio) * image size
+
+# Inference
+val_score_thr: 0.1
+score_threshold: 0.1

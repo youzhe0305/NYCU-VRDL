@@ -1,0 +1,41 @@
+# Dataset
+nycu-hw2-data/
+nycu-hw2-data.tar.gz
+
+# Model checkpoints (large, ~438MB each)
+checkpoints_DINO/
+
+# Training logs (generated during training)
+log_DINO/*.json
+
+# Inference outputs
+predictions/pred*.json
+predictions/fused.json
+predictions/example_pred.json
+predictions/submission.zip
+predictions/confusion_matrix*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Original DINO repo (cloned for reference, has its own .git)
+DINO/
+
+# Early experiments (replaced by DINO)
+unused/
+
+# Archive folder (local reference only)
+archive/
+
+# Editor / OS
+.DS_Store
+.vscode/
+*.swp
+*.swo
+
+# Misc
+*.tmp

@@ -44,3 +44,14 @@ Thumbs.db
 # others
 HW1/vote.py
 .flake8
+
+# HW2 — large/generated files
+HW2/checkpoints_DINO/
+HW2/nycu-hw2-data/
+HW2/unused/
+HW2/archive/
+HW2/log_DINO/*.json
+HW2/predictions/*.json
+HW2/predictions/submission.zip
+HW2/predictions/confusion_matrix*
+HW2/__pycache__/
