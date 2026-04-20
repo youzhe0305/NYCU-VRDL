@@ -1,4 +1,4 @@
-# Digit Detection with DINO
+# NYCU VRDL 2026 HW2 - Digit Detection with DINO
 
 * Student ID: 112550069
 * Name: You Zhe, Xie
