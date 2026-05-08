@@ -14,9 +14,10 @@ from mmengine.registry import DefaultScope
 @MODELS.register_module(force=True)
 class ConvNeXtV2Backbone(nn.Module):
 
-    def __init__(self, model_name="convnextv2_base", pretrained=True,
-                 drop_path_rate=0.4, out_indices=(0, 1, 2, 3),
-                 freeze_stages=0, img_size=None, norm_type="LayerNorm"):
+    def __init__(self, model_name="convnextv2_base",
+                 pretrained=True, drop_path_rate=0.4,
+                 out_indices=(0, 1, 2, 3), freeze_stages=0,
+                 img_size=None, norm_type="LayerNorm"):
         super().__init__()
         create_kwargs = dict(
             pretrained=pretrained,
@@ -53,9 +54,9 @@ class ConvNeXtV2Backbone(nn.Module):
         for name, param in self.named_parameters():
             freeze = name.startswith("body.stem")
             for s in range(self.freeze_stages):
-                if name.startswith(f"body.stages.{s}") or \
-                   name.startswith(f"body.stages_{s}") or \
-                   name.startswith(f"norms.{s}"):
+                if (name.startswith(f"body.stages.{s}")
+                        or name.startswith(f"body.stages_{s}")
+                        or name.startswith(f"norms.{s}")):
                     freeze = True
             if freeze:
                 param.requires_grad = False
@@ -152,8 +153,9 @@ def _build_model_cfg(cfg):
         in_channels = [192, 384, 768, 1536]
     elif backbone_name.startswith(("convnextv2_tiny", "convnextv2_small")):
         in_channels = [96, 192, 384, 768]
-    elif backbone_name.startswith(("convnextv2_atto", "convnextv2_femto",
-                                   "convnextv2_pico", "convnextv2_nano")):
+    elif backbone_name.startswith(
+            ("convnextv2_atto", "convnextv2_femto",
+             "convnextv2_pico", "convnextv2_nano")):
         in_channels = [40, 80, 160, 320]
     else:
         in_channels = [128, 256, 512, 1024]
@@ -336,8 +338,11 @@ def _build_model_cfg(cfg):
             norm_cfg=dict(type="BN", requires_grad=True),
             norm_eval=True,
             style="pytorch",
-            init_cfg=dict(type="Pretrained", checkpoint="torchvision://resnet50")
-            if cfg.get("pretrained", True) else None,
+            init_cfg=(
+                dict(type="Pretrained",
+                     checkpoint="torchvision://resnet50")
+                if cfg.get("pretrained", True) else None
+            ),
         )
     else:
         backbone_cfg = dict(
@@ -607,9 +612,9 @@ def build_model(cfg):
         for name, param in model.backbone.named_parameters():
             freeze = name.startswith("body.stem")
             for s in range(freeze_stages):
-                if name.startswith(f"body.stages.{s}") or \
-                   name.startswith(f"body.stages_{s}") or \
-                   name.startswith(f"norms.{s}"):
+                if (name.startswith(f"body.stages.{s}")
+                        or name.startswith(f"body.stages_{s}")
+                        or name.startswith(f"norms.{s}")):
                     freeze = True
             if freeze:
                 param.requires_grad = False

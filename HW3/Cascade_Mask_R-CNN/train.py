@@ -4,10 +4,24 @@ import io
 import json
 import os
 import random
-import sys
-import time
 import warnings
 from datetime import datetime
+
+import cv2
+import numpy as np
+import torch
+import yaml
+from mmdet.evaluation import CocoMetric
+from mmdet.registry import METRICS
+from mmengine.hooks import Hook
+from mmengine.registry import HOOKS
+from pycocotools import mask as mask_utils
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
+from torch.amp import autocast
+from tqdm.auto import tqdm
+
+from model import _build_model_cfg
 
 warnings.filterwarnings(
     "ignore",
@@ -24,25 +38,6 @@ warnings.filterwarnings(
     message=r".*sourceTensor\.clone\(\)\.detach\(\).*",
     category=UserWarning,
 )
-
-import cv2
-import numpy as np
-import torch
-import yaml
-from mmengine.hooks import Hook
-from mmengine.registry import HOOKS
-from pycocotools import mask as mask_utils
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
-from torch.amp import autocast
-from torch.cuda.amp import GradScaler  # torch.amp.GradScaler added in 2.2; use cuda.amp for 2.1 compat
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
-from tqdm.auto import tqdm
-from mmdet.evaluation import CocoMetric
-from mmdet.registry import METRICS
-
-from model import _build_model_cfg
 
 
 @METRICS.register_module(force=True)
@@ -66,7 +61,8 @@ class CompactTrainLogHook(Hook):
         if "best_score" in runner.message_hub.runtime_info:
             self.best_mAP50 = float(runner.message_hub.get_info("best_score"))
 
-    def after_train_iter(self, runner, batch_idx, data_batch=None, outputs=None):
+    def after_train_iter(self, runner, batch_idx,
+                         data_batch=None, outputs=None):
         if isinstance(outputs, dict) and "loss" in outputs:
             loss = outputs["loss"]
             if hasattr(loss, "detach"):
@@ -90,7 +86,7 @@ class CompactTrainLogHook(Hook):
 
     def after_val_epoch(self, runner, metrics=None):
         metrics = metrics or {}
-        epoch = runner.epoch + 1
+        epoch = max(int(runner.epoch), 1)
         segm_ap50 = metrics.get("coco/segm_mAP_50")
         if segm_ap50 is not None:
             segm_ap50 = float(segm_ap50)
@@ -174,7 +170,7 @@ class TrainingArtifactsHook(Hook):
 
     def after_val_epoch(self, runner, metrics=None):
         metrics = metrics or {}
-        epoch = runner.epoch + 1
+        epoch = max(int(runner.epoch), 1)
         segm_ap50 = metrics.get("coco/segm_mAP_50")
         if segm_ap50 is not None:
             self.val_history.append({
@@ -298,7 +294,8 @@ class TrainingArtifactsHook(Hook):
             cv2.putText(canvas, f"GT | Pred  img_id={img_id}", (8, 24),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2,
                         cv2.LINE_AA)
-            out_path = os.path.join(vis_dir, f"sample_{i:02d}_img_{img_id}.png")
+            fname = f"sample_{i:02d}_img_{img_id}.png"
+            out_path = os.path.join(vis_dir, fname)
             cv2.imwrite(out_path, canvas)
             panels.append(canvas)
         if panels:
@@ -356,22 +353,23 @@ class TrainingArtifactsHook(Hook):
                 self._confusion[self.bg_idx, int(label)] += 1
 
     def _draw_instances(self, image, data_sample, is_prediction):
-        img_shape = data_sample.metainfo.get("img_shape", image.shape[:2])
+        img_shape = data_sample.metainfo.get(
+            "img_shape", image.shape[:2],
+        )
         image = image[:img_shape[0], :img_shape[1]].copy()
-        instances = data_sample.pred_instances if is_prediction else \
-            data_sample.gt_instances
+        instances = (data_sample.pred_instances if is_prediction
+                     else data_sample.gt_instances)
         labels = self._labels(instances)
         masks = self._masks(instances)
-        scores = self._scores(instances) if is_prediction else \
-            np.ones(len(labels), dtype=np.float32)
+        scores = (self._scores(instances) if is_prediction
+                  else np.ones(len(labels), dtype=np.float32))
         order = np.argsort(scores)[::-1]
         for idx in order:
             if is_prediction and scores[idx] < self.draw_score_thr:
                 continue
             label = int(labels[idx])
             color = self._color(label)
-            mask = masks[idx].astype(bool)
-            mask = mask[:image.shape[0], :image.shape[1]]
+            mask = self._resize_mask_to_image(masks[idx], image.shape[:2])
             image[mask] = (0.55 * image[mask] + 0.45 *
                            np.array(color, dtype=np.float32)).astype(np.uint8)
             x1, y1, x2, y2 = self._bbox_from_mask(mask)
@@ -387,6 +385,18 @@ class TrainingArtifactsHook(Hook):
         cv2.putText(image, title, (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.65,
                     (255, 255, 255), 2, cv2.LINE_AA)
         return image
+
+    @staticmethod
+    def _resize_mask_to_image(mask, image_shape):
+        mask = mask.astype(bool)
+        h, w = image_shape
+        if mask.shape[:2] == (h, w):
+            return mask
+        return cv2.resize(
+            mask.astype(np.uint8),
+            (w, h),
+            interpolation=cv2.INTER_NEAREST,
+        ).astype(bool)
 
     def _image_from_input(self, inp):
         image = inp.detach().cpu().numpy() if hasattr(inp, "detach") else inp
@@ -536,7 +546,9 @@ def validate(model, val_loader, device, score_thr=0.05, coco_verbose=False):
                     "segmentation": rle,
                     "area": int(m.sum()),
                     "bbox": mask_utils.toBbox(
-                        mask_utils.encode(np.asfortranarray(m.astype(np.uint8)))
+                        mask_utils.encode(
+                            np.asfortranarray(
+                                m.astype(np.uint8)))
                     ).tolist(),
                     "iscrowd": 0,
                 })
@@ -545,8 +557,11 @@ def validate(model, val_loader, device, score_thr=0.05, coco_verbose=False):
             pred = res.pred_instances
             pred_scores = pred.scores.cpu().numpy()
             pred_labels = pred.labels.cpu().numpy()
-            pred_masks = pred.masks.cpu().numpy() if hasattr(pred, "masks") \
+            pred_masks = (
+                pred.masks.cpu().numpy()
+                if hasattr(pred, "masks")
                 else np.zeros((0, h, w), dtype=np.uint8)
+            )
 
             for i in range(len(pred_scores)):
                 if pred_scores[i] < score_thr:
@@ -603,8 +618,8 @@ def build_runner_config(args):
     from dataset import get_train_pipeline, get_val_pipeline
 
     data_root = _hw3_path(args.data_dir)
-    ann_dir = _hw3_path(args.ann_dir) if args.ann_dir else \
-        os.path.join(data_root, "annotations")
+    ann_dir = (_hw3_path(args.ann_dir) if args.ann_dir
+               else os.path.join(data_root, "annotations"))
     img_scale = args.img_scale
     multiscale = bool(args.multiscale)
     use_amp = bool(args.amp)
@@ -788,13 +803,17 @@ def train_with_runner(args):
 
     if args.device and str(args.device).startswith("cuda"):
         if not torch.cuda.is_available():
-            raise RuntimeError(f"Requested {args.device}, but CUDA is not available.")
+            raise RuntimeError(
+                f"Requested {args.device}, but CUDA is not "
+                "available."
+            )
         device_text = str(args.device)
         device_idx = 0
         if ":" in device_text:
             device_idx = int(device_text.split(":", 1)[1])
         torch.cuda.set_device(device_idx)
-        print(f"Using device: cuda:{device_idx} ({torch.cuda.get_device_name(device_idx)})")
+        gpu_name = torch.cuda.get_device_name(device_idx)
+        print(f"Using device: cuda:{device_idx} ({gpu_name})")
     elif args.device:
         print(f"Using device: {args.device}")
 
@@ -1032,5 +1051,6 @@ if __name__ == "__main__":
     if args.run_start_time is None:
         args.run_start_time = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    print(f"Config: {json.dumps({k: v for k, v in vars(args).items()}, indent=2, default=str)}")
+    cfg_str = json.dumps(dict(vars(args)), indent=2, default=str)
+    print(f"Config: {cfg_str}")
     train_with_runner(args)

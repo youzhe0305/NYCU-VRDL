@@ -119,9 +119,13 @@ def subset_coco(images, annotations, image_ids):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Prepare single COCO train/val split")
-    parser.add_argument("--config", default=None,
-                        help="Optional yaml config to read val_ratio from.")
+    parser = argparse.ArgumentParser(
+        description="Prepare single COCO train/val split",
+    )
+    parser.add_argument(
+        "--config", default=None,
+        help="Optional yaml config to read val_ratio from.",
+    )
     parser.add_argument("--data_root", default="../data")
     parser.add_argument("--output_dir", default=None)
     parser.add_argument("--val_ratio", type=float, default=None)

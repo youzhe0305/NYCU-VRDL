@@ -5,15 +5,12 @@ import os
 
 import cv2
 import numpy as np
+import tifffile
 import torch
 import torchvision
 import yaml
-import tifffile
 from pycocotools import mask as mask_utils
 from tqdm.auto import tqdm
-
-
-# ─── TTA helpers ───
 
 
 def _encode_submission_mask(binary_mask):
@@ -138,9 +135,11 @@ def _predict_one_model(detector, image, args, model_idx=0):
         boxes = pred.bboxes.cpu().numpy().astype(np.float32)
         labels = pred.labels.cpu().numpy().astype(np.int64)
         scores = pred.scores.cpu().numpy().astype(np.float32)
-        masks = pred.masks.cpu().numpy().astype(np.uint8) \
-            if hasattr(pred, "masks") and pred.masks is not None \
+        masks = (
+            pred.masks.cpu().numpy().astype(np.uint8)
+            if hasattr(pred, "masks") and pred.masks is not None
             else np.zeros((0, height, width), dtype=np.uint8)
+        )
 
         if direction:
             boxes, masks = _flip_numpy_predictions(
@@ -150,16 +149,21 @@ def _predict_one_model(detector, image, args, model_idx=0):
         all_scores.append(scores)
         all_masks.append(_resize_masks(masks, height, width))
 
-    boxes = np.concatenate(all_boxes) if all_boxes else np.zeros((0, 4), np.float32)
-    labels = np.concatenate(all_labels) if all_labels else np.zeros(0, np.int64)
-    scores = np.concatenate(all_scores) if all_scores else np.zeros(0, np.float32)
-    masks = np.concatenate(all_masks) if all_masks else \
-        np.zeros((0, height, width), dtype=np.uint8)
+    boxes = (np.concatenate(all_boxes) if all_boxes
+             else np.zeros((0, 4), np.float32))
+    labels = (np.concatenate(all_labels) if all_labels
+              else np.zeros(0, np.int64))
+    scores = (np.concatenate(all_scores) if all_scores
+              else np.zeros(0, np.float32))
+    masks = (np.concatenate(all_masks) if all_masks
+             else np.zeros((0, height, width), dtype=np.uint8))
     model_ids = np.full(len(scores), model_idx, dtype=np.int32)
 
     keep = scores >= args.per_model_score_threshold
     boxes, labels, scores, masks, model_ids = (
-        boxes[keep], labels[keep], scores[keep], masks[keep], model_ids[keep])
+        boxes[keep], labels[keep], scores[keep],
+        masks[keep], model_ids[keep],
+    )
 
     if len(scores) > 0 and args.tta:
         keep_indices = []
@@ -171,10 +175,14 @@ def _predict_one_model(detector, image, args, model_idx=0):
                 args.nms_threshold,
             ).numpy()
             keep_indices.extend(cls_idx[kept].tolist())
-        keep_indices = np.asarray(sorted(keep_indices), dtype=np.int64)
+        keep_indices = np.asarray(
+            sorted(keep_indices), dtype=np.int64,
+        )
         boxes, labels, scores, masks, model_ids = (
-            boxes[keep_indices], labels[keep_indices], scores[keep_indices],
-            masks[keep_indices], model_ids[keep_indices])
+            boxes[keep_indices], labels[keep_indices],
+            scores[keep_indices], masks[keep_indices],
+            model_ids[keep_indices],
+        )
 
     return boxes, labels, scores, masks, model_ids
 
@@ -192,10 +200,11 @@ def _find_checkpoint(args):
 
 def run_mmdet_inference(args):
     data_dir = _hw3_path(args.data_dir)
-    test_dir = _hw3_path(args.test_dir) if args.test_dir else \
-        os.path.join(data_dir, "test_release")
-    mapping_path = _hw3_path(args.id_mapping) if args.id_mapping else \
-        os.path.join(data_dir, "test_image_name_to_ids.json")
+    test_dir = (_hw3_path(args.test_dir) if args.test_dir
+                else os.path.join(data_dir, "test_release"))
+    mapping_path = (_hw3_path(args.id_mapping) if args.id_mapping
+                    else os.path.join(data_dir,
+                                      "test_image_name_to_ids.json"))
 
     with open(mapping_path) as f:
         id_mapping = json.load(f)
@@ -234,8 +243,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Cascade Mask R-CNN inference")
     parser.add_argument("--config", default="configs/cascade_mask_rcnn.yaml")
-    parser.add_argument("--checkpoint", default=None,
-                        help="Checkpoint path. If omitted, the best checkpoint in work_dir is used.")
+    parser.add_argument(
+        "--checkpoint", default=None,
+        help="Checkpoint path. If omitted, the best checkpoint "
+             "in work_dir is used.",
+    )
     parser.add_argument("--data_dir", default=None)
     parser.add_argument("--test_dir", default=None)
     parser.add_argument("--id_mapping", default=None)
@@ -248,7 +260,9 @@ if __name__ == "__main__":
     parser.add_argument("--tta", action=argparse.BooleanOptionalAction,
                         default=None)
     parser.add_argument("--score_threshold", type=float, default=None)
-    parser.add_argument("--per_model_score_threshold", type=float, default=None)
+    parser.add_argument(
+        "--per_model_score_threshold", type=float, default=None,
+    )
     parser.add_argument("--mask_threshold", type=float, default=None)
     parser.add_argument("--nms_threshold", type=float, default=None)
     parser.add_argument("--max_det", type=int, default=None)
