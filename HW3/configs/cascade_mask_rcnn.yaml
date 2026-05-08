@@ -1,0 +1,204 @@
+# -----------------------------------------------------------------------
+# HW3 — Cascade Mask R-CNN + ConvNeXt-V2-Base (configs/cascade_mask_rcnn.yaml)
+# Ref: spec/Cascade.md
+# -----------------------------------------------------------------------
+
+# ── Data ──
+data_dir: data
+ann_dir: null
+save_dir: checkpoints/cascade_mask_rcnn
+log_dir: log/cascade_mask_rcnn
+work_dir: work_dirs/cascade_mask_rcnn
+seed: 42
+num_workers: 4
+
+# ── Train / Validation Split ──
+val_ratio: 0.1
+
+# ── Training ──
+device: cuda:0
+epochs: 50
+batch_size: 2
+lr: 1.0e-4                # head / neck / RPN learning rate
+backbone_lr: 1.0e-5       # backbone_lr = lr × backbone_lr_mult (0.1)
+weight_decay: 0.05         # AdamW L2 regularization
+grad_clip: 1.0             # L2 gradient clip max_norm
+amp: true                  # match the HW3 run script setting
+
+# ── Scheduler ──
+warmup_epochs: 5           # linear warmup from 0.001×lr → lr
+min_lr: 1.0e-6             # cosine annealing min lr (= lr × min_lr_ratio 0.01)
+
+# ── Model: Backbone ──
+detector_type: CascadeRCNN
+backbone_type: ConvNeXtV2Backbone
+backbone_name: convnextv2_base
+backbone_out_channels: null
+backbone_img_size: null
+backbone_depth: 50
+resnet_frozen_stages: -1
+backbone_norm_type: LayerNorm
+pretrained: true            # ImageNet pretrained
+drop_path_rate: 0.1         # stochastic depth
+freeze_stages: 0            # freeze backbone stem + first N stages (0 = no freeze)
+
+# ── Model: FPN ──
+neck_type: FPN
+fpn_out_channels: 256
+fpn_num_outs: 5
+nasfpn_stack_times: 1
+neck_no_norm_on_lateral: null
+neck_add_extra_convs: null
+neck_relu_before_extra_convs: null
+neck_upsample_cfg: null
+neck_norm_cfg: null
+neck_act_cfg: null
+roi_featmap_strides: [4, 8, 16, 32]
+bbox_roi_extractor_type: SingleRoIExtractor
+mask_roi_extractor_type: SingleRoIExtractor
+roi_layer_type: RoIAlign
+roi_aggregation: sum
+roi_sampling_ratio: 0
+
+# ── Model: Classes ──
+num_classes: 4              # 4 cell types (MMDetection handles background internally)
+
+# ── Model: Cascade RoI Head ──
+cascade_iou_thresholds: [0.5, 0.6, 0.7]
+cascade_stage_weights: [1.0, 0.5, 0.25]
+cascade_bbox_weights:       # (wx, wy, ww, wh) per stage → target_stds inverse
+  - [10.0, 10.0, 5.0, 5.0]       # stage1: stds = (0.1, 0.1, 0.2, 0.2)
+  - [20.0, 20.0, 10.0, 10.0]     # stage2: stds = (0.05, 0.05, 0.1, 0.1)
+  - [30.0, 30.0, 15.0, 15.0]     # stage3: stds = (0.033, 0.033, 0.067, 0.067)
+cascade_target_stds:
+  - [0.1, 0.1, 0.2, 0.2]
+  - [0.05, 0.05, 0.1, 0.1]
+  - [0.033, 0.033, 0.067, 0.067]
+reg_class_agnostic: true    # all classes share one bbox regressor (good for small datasets)
+mask_size: 28               # GT mask size for mask head supervision
+bbox_head_type: Shared2FCBBoxHead
+bbox_loss_cls_type: CrossEntropyLoss
+bbox_focal_gamma: 2.0
+bbox_focal_alpha: 0.25
+bbox_loss_cls_weight: 1.0
+bbox_loss_type: SmoothL1Loss
+bbox_loss_weight: 1.0
+bbox_smooth_l1_beta: 1.0
+bbox_balanced_l1_alpha: 0.5
+bbox_balanced_l1_gamma: 1.5
+bbox_balanced_l1_beta: 1.0
+bbox_reg_decoded_bbox: false
+bbox_num_shared_convs: 2
+bbox_num_shared_fcs: 1
+bbox_num_convs: 4
+bbox_num_fcs: 2
+bbox_conv_out_channels: 256
+
+# ── Model: RPN ──
+rpn_head_type: RPNHead
+rpn_loss_cls_type: CrossEntropyLoss
+rpn_focal_gamma: 2.0
+rpn_focal_alpha: 0.25
+rpn_loss_cls_weight: 1.0
+rpn_loss_bbox_weight: 1.0
+anchor_scale: 4                 # smaller anchor base size for cell-scale proposals
+anchor_ratios: [1.0]
+ga_scales_per_octave: 3
+ga_approx_ratios: [1.0]
+ga_loc_filter_thr: 0.01
+ga_allowed_border: -1
+ga_center_ratio: 0.2
+ga_ignore_ratio: 0.5
+ga_anchor_target_stds: [0.07, 0.07, 0.14, 0.14]
+ga_bbox_target_stds: [0.07, 0.07, 0.11, 0.11]
+rpn_strides: [4, 8, 16, 32, 64]
+rpn_pos_iou_thr: 0.7
+rpn_neg_iou_thr: 0.3
+rpn_batch_size: 256         # anchors sampled per image
+rpn_positive_fraction: 0.5
+rpn_assigner_type: MaxIoUAssigner
+rpn_atss_topk: 9
+rpn_sampler_type: RandomSampler
+rpn_pos_sampler_type: InstanceBalancedPosSampler
+rpn_neg_sampler_type: IoUBalancedNegSampler
+rpn_iou_balanced_floor_thr: -1
+rpn_iou_balanced_floor_fraction: 0
+rpn_iou_balanced_num_bins: 3
+rpn_allowed_border: 0
+rpn_nms_thresh: 0.45
+rpn_pre_nms_train: 2000
+rpn_post_nms_train: 2000
+rpn_pre_nms_test: 1000
+rpn_post_nms_test: 1000
+
+# ── Model: RoI Heads ──
+roi_out_size_bbox: 7
+roi_out_size_mask: 14
+fc_out_channels: 1024
+mask_head_type: DiceFCNMaskHead
+mask_num_convs: 4
+mask_class_agnostic: false
+mask_conv_to_res: true
+mask_dice_loss_weight: 1.0
+mask_ce_loss_weight: 1.0
+rcnn_batch_size: 512        # RoIs sampled per image
+rcnn_positive_fraction: 0.25
+rcnn_sampler_type: RandomSampler
+rcnn_pos_sampler_type: InstanceBalancedPosSampler
+rcnn_neg_sampler_type: IoUBalancedNegSampler
+rcnn_iou_balanced_floor_thr: -1
+rcnn_iou_balanced_floor_fraction: 0
+rcnn_iou_balanced_num_bins: 3
+rcnn_ohem_loss_key: loss_cls
+
+# ── Image / Augmentation ──
+img_scale: 1024             # train & val image scale
+resize_ratio_min: 0.5       # RandomResize ratio range lower
+resize_ratio_max: 2.0       # RandomResize ratio range upper
+crop_size_h: 1024           # RandomCrop height
+crop_size_w: 1024           # RandomCrop width
+horizontal_flip: true
+vertical_flip: true
+hflip_prob: 0.5
+vflip_prob: 0.5
+pad_val: 114                # padding fill value (≈ImageNet mean grey)
+min_gt_bbox_wh: [1, 1]     # FilterAnnotations: discard GT with w or h < 1
+filter_empty_gt: true       # skip images with no GT during training
+min_size: 32                # skip images smaller than 32 px
+
+# Phase 2 augmentation (disabled by default — enable for stronger aug)
+color_jitter: false
+color_jitter_brightness: 0.3
+color_jitter_contrast: 0.3
+color_jitter_saturation: 0.3
+color_jitter_hue: 0.1
+rotate90: false
+elastic: false
+elastic_prob: 0.1
+copy_paste: false
+copy_paste_prob: 0.5
+
+# ── Validation ──
+val_interval: 1             # validate every N epochs
+save_interval: 10
+log_interval: 1000000000    # suppress verbose per-iteration MMEngine logs
+log_level: WARNING          # suppress paramwise INFO spam; compact hook prints summary
+score_threshold: 0.05       # final output confidence threshold
+mask_threshold: 0.5         # mask binarization threshold (sigmoid → binary)
+coco_verbose: false
+training_artifacts: true
+artifact_dir_name: analysis
+artifact_interval: 1
+artifact_num_visualizations: 6
+artifact_seed: 42
+artifact_score_threshold: 0.05
+artifact_draw_score_threshold: 0.3
+artifact_mask_iou_threshold: 0.5
+
+# ── Inference ──
+tta: true                   # 3 views: original, H-flip, V-flip
+multiscale: true
+per_model_score_threshold: 0.03   # loose threshold before final filtering
+nms_threshold: 0.5          # per-model class-wise NMS IoU
+max_det: 300                # max detections per image
+wandb_project: none

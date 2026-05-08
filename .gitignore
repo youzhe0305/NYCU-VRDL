@@ -55,3 +55,24 @@ HW2/predictions/*.json
 HW2/predictions/submission.zip
 HW2/predictions/confusion_matrix*
 HW2/__pycache__/
+
+# HW3 — large/generated files
+HW3/data/
+HW3/work_dirs/
+HW3/pretrained_weight/
+HW3/.cache/
+HW3/paper/
+HW3/log/
+HW3/history/
+HW3/spec/
+HW3/submit/
+HW3/test-results*.json
+HW3/run.log
+HW3/results.tsv
+HW3/plan.md
+HW3/program.md
+HW3/IMPLEMENT.md
+HW3/report_ZH.md
+HW3/Cascade_Mask_R-CNN/=2.0.0
+HW3/Mask_R-CNN/
+HW3/Mask2Former/

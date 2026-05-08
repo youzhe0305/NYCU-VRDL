@@ -1,0 +1,25 @@
+# PyTorch — use cu121 wheels (CUDA 13.x/12.x drivers are backward-compatible with cu121 runtime)
+# mmcv pre-built wheels only exist up to cu121; using cu118/cu128/cu130 has no mmcv wheel → source build fails
+# Install with: pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu121
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.1.0+cu121
+torchvision==0.16.0+cu121
+
+# mmcv MUST be installed via OpenMMLab index (no PyPI CUDA wheel):
+# mmcv 2.2.0 is hard-incompatible with mmdet 3.3.0 (assertion error on import)
+--find-links https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html
+mmcv==2.1.0
+
+# mmengine <1.0.0 required by mmdet 3.3.0 (hard version check in mmdet/__init__.py)
+mmengine>=0.7.1,<1.0.0
+mmdet==3.3.0
+
+timm
+albumentations
+opencv-python
+numpy
+scikit-learn
+pycocotools
+PyYAML
+tifffile
+tqdm
