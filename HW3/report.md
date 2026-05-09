@@ -4,6 +4,8 @@ Visual Recognition HW3
 
 You-Zhe Xie
 
+github: https://github.com/youzhe0305/NYCU-VRDL/tree/main/HW3
+
 ---
 
 ## 1. Introduction
