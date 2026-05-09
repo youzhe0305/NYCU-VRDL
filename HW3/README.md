@@ -5,7 +5,9 @@
 
 4-class instance segmentation on medical cell microscopy images using **Cascade Mask R-CNN** with a **ConvNeXt-V2-Base** backbone and **FPN**. Built for the Visual Recognition HW3 competition.
 
-See [report](report.md) for the detailed method, results, and ablation study.
+See [report](report.pdf) for the detailed method, results, and ablation study.
+
+![alt text](figures/leaderboard.png)
 
 ## Introduction
 
