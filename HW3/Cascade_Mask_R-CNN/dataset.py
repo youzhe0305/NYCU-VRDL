@@ -1,97 +1,95 @@
-import numpy as np
-import tifffile
 from mmcv.transforms import BaseTransform
 from mmdet.registry import TRANSFORMS
 
+from cell_io import image_size, read_tif_as_bgr
 
-@TRANSFORMS.register_module()
-class LoadTifImageFromFile(BaseTransform):
+
+@TRANSFORMS.register_module(name="LoadTifImageFromFile", force=True)
+class TiffFrameLoader(BaseTransform):
     def __init__(self, to_float32=False, color_type="color"):
         self.to_float32 = to_float32
         self.color_type = color_type
 
-    def transform(self, results):
-        image = tifffile.imread(results["img_path"])
-        if image.ndim == 2:
-            image = np.stack([image, image, image], axis=-1)
-        elif image.ndim == 3 and image.shape[2] >= 4:
-            image = image[:, :, :3]
-        if image.ndim == 3 and image.shape[2] == 3:
-            image = image[:, :, ::-1]
-        image = np.ascontiguousarray(image, dtype=np.uint8)
-        if self.to_float32:
-            image = image.astype(np.float32)
-        results["img"] = image
-        results["img_shape"] = image.shape[:2]
-        results["ori_shape"] = image.shape[:2]
-        return results
+    def transform(self, record):
+        frame = read_tif_as_bgr(record["img_path"], float32=self.to_float32)
+        record.update(
+            img=frame,
+            img_shape=frame.shape[:2],
+            ori_shape=frame.shape[:2],
+        )
+        return record
 
 
-def _scale_tuple(img_scale):
-    if isinstance(img_scale, int):
-        return (img_scale, img_scale)
-    return tuple(img_scale)
+def _loader():
+    return dict(type="LoadTifImageFromFile")
 
 
-def get_train_pipeline(img_scale=1024, multiscale=True):
-    img_scale = _scale_tuple(img_scale)
-    pipeline = [
-        dict(type="LoadTifImageFromFile"),
-        dict(type="LoadAnnotations", with_bbox=True, with_mask=True),
+def _pad_to_canvas(side, value=114):
+    return dict(type="Pad", size=side, pad_val=dict(img=(value, value, value)))
+
+
+def _pack(include_gt):
+    meta = ("img_id", "img_path", "ori_shape", "img_shape", "scale_factor")
+    if include_gt:
+        return dict(type="PackDetInputs", meta_keys=meta)
+    return dict(type="PackDetInputs", meta_keys=meta)
+
+
+def _resize_stage(side, multiscale):
+    if not multiscale:
+        return [dict(type="Resize", scale=side, keep_ratio=True)]
+    return [
+        dict(
+            type="RandomResize",
+            scale=side,
+            ratio_range=(0.5, 2.0),
+            keep_ratio=True,
+        ),
+        dict(
+            type="RandomCrop",
+            crop_size=side,
+            crop_type="absolute",
+            recompute_bbox=True,
+            allow_negative_crop=True,
+        ),
     ]
-    if multiscale:
-        pipeline.extend([
-            dict(
-                type="RandomResize",
-                scale=img_scale,
-                ratio_range=(0.5, 2.0),
-                keep_ratio=True,
-            ),
-            dict(
-                type="RandomCrop",
-                crop_size=img_scale,
-                crop_type="absolute",
-                recompute_bbox=True,
-                allow_negative_crop=True,
-            ),
-        ])
-    else:
-        pipeline.append(dict(type="Resize", scale=img_scale, keep_ratio=True))
 
-    pipeline.extend([
+
+def training_recipe(img_scale=1024, multiscale=True):
+    side = image_size(img_scale)
+    flow = [
+        _loader(),
+        dict(type="LoadAnnotations", with_bbox=True, with_mask=True),
+        *_resize_stage(side, multiscale),
         dict(type="RandomFlip", prob=0.5, direction="horizontal"),
         dict(type="RandomFlip", prob=0.5, direction="vertical"),
         dict(type="FilterAnnotations", min_gt_bbox_wh=(1, 1)),
-        dict(type="Pad", size=img_scale, pad_val=dict(img=(114, 114, 114))),
+        _pad_to_canvas(side),
         dict(type="PackDetInputs"),
-    ])
-    return pipeline
+    ]
+    return flow
+
+
+def eval_recipe(img_scale=1024, *, annotations):
+    side = image_size(img_scale)
+    flow = [
+        _loader(),
+        dict(type="Resize", scale=side, keep_ratio=True),
+        _pad_to_canvas(side),
+    ]
+    if annotations:
+        flow.append(dict(type="LoadAnnotations", with_bbox=True, with_mask=True))
+    flow.append(_pack(include_gt=annotations))
+    return flow
+
+
+def get_train_pipeline(img_scale=1024, multiscale=True):
+    return training_recipe(img_scale, multiscale)
 
 
 def get_val_pipeline(img_scale=1024):
-    img_scale = _scale_tuple(img_scale)
-    return [
-        dict(type="LoadTifImageFromFile"),
-        dict(type="Resize", scale=img_scale, keep_ratio=True),
-        dict(type="Pad", size=img_scale, pad_val=dict(img=(114, 114, 114))),
-        dict(type="LoadAnnotations", with_bbox=True, with_mask=True),
-        dict(
-            type="PackDetInputs",
-            meta_keys=("img_id", "img_path", "ori_shape", "img_shape",
-                       "scale_factor"),
-        ),
-    ]
+    return eval_recipe(img_scale, annotations=True)
 
 
 def get_test_pipeline(img_scale=1024):
-    img_scale = _scale_tuple(img_scale)
-    return [
-        dict(type="LoadTifImageFromFile"),
-        dict(type="Resize", scale=img_scale, keep_ratio=True),
-        dict(type="Pad", size=img_scale, pad_val=dict(img=(114, 114, 114))),
-        dict(
-            type="PackDetInputs",
-            meta_keys=("img_id", "img_path", "ori_shape", "img_shape",
-                       "scale_factor"),
-        ),
-    ]
+    return eval_recipe(img_scale, annotations=False)

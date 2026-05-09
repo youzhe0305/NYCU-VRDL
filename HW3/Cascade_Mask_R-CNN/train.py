@@ -21,7 +21,8 @@ from pycocotools.cocoeval import COCOeval
 from torch.amp import autocast
 from tqdm.auto import tqdm
 
-from model import _build_model_cfg
+from model import detector_blueprint
+from runtime_defaults import TRAIN_FALLBACKS, populate_runtime_args
 
 warnings.filterwarnings(
     "ignore",
@@ -624,7 +625,7 @@ def build_runner_config(args):
     multiscale = bool(args.multiscale)
     use_amp = bool(args.amp)
 
-    model_cfg = _build_model_cfg(vars(args))
+    model_cfg = detector_blueprint(vars(args))
     train_ann = os.path.join(ann_dir, "train.json")
     val_ann = os.path.join(ann_dir, "val.json")
 
@@ -830,7 +831,7 @@ def train_with_runner(args):
     runner.train()
 
 
-if __name__ == "__main__":
+def make_training_parser():
     parser = argparse.ArgumentParser(description="Train Cascade Mask R-CNN")
     parser.add_argument("--config", default="configs/cascade_mask_rcnn.yaml")
     parser.add_argument("--data_dir", default=None)
@@ -873,8 +874,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--resume", default=None)
     parser.add_argument("--load_weight", default=None)
-    args = parser.parse_args()
+    return parser
 
+
+def hydrate_training_args(args):
     cfg = load_config(args.config)
     for key, val in vars(args).items():
         if key == "config":
@@ -882,175 +885,19 @@ if __name__ == "__main__":
         if val is None and key in cfg:
             setattr(args, key, cfg[key])
 
-    defaults = {
-        "data_dir": "data",
-        "ann_dir": None,
-        "save_dir": "checkpoints/cascade_mask_rcnn",
-        "log_dir": "log/cascade_mask_rcnn",
-        "work_dir": "work_dirs/cascade_mask_rcnn",
-        "device": "cuda:0",
-        "epochs": 50,
-        "batch_size": 2,
-        "lr": 1e-4,
-        "backbone_lr": 1e-5,
-        "weight_decay": 0.05,
-        "grad_clip": 1.0,
-        "amp": True,
-        "num_classes": 4,
-        "num_workers": 4,
-        "seed": 42,
-        "warmup_epochs": 5,
-        "min_lr": 1e-6,
-        "val_interval": 1,
-        "save_interval": 10,
-        "log_interval": 1000000000,
-        "log_level": "WARNING",
-        "score_threshold": 0.05,
-        "mask_threshold": 0.5,
-        "coco_verbose": False,
-        "pretrained": True,
-        "detector_type": "CascadeRCNN",
-        "backbone_type": "ConvNeXtV2Backbone",
-        "backbone_name": "convnextv2_base",
-        "backbone_out_channels": None,
-        "backbone_img_size": None,
-        "backbone_depth": 50,
-        "resnet_frozen_stages": -1,
-        "backbone_norm_type": "LayerNorm",
-        "drop_path_rate": 0.4,
-        "neck_type": "FPN",
-        "fpn_out_channels": 256,
-        "fpn_num_outs": 5,
-        "nasfpn_stack_times": 1,
-        "neck_no_norm_on_lateral": None,
-        "neck_add_extra_convs": None,
-        "neck_relu_before_extra_convs": None,
-        "neck_upsample_cfg": None,
-        "neck_norm_cfg": None,
-        "neck_act_cfg": None,
-        "rpn_strides": [4, 8, 16, 32, 64],
-        "rpn_head_type": "RPNHead",
-        "rpn_loss_cls_type": "CrossEntropyLoss",
-        "rpn_focal_gamma": 2.0,
-        "rpn_focal_alpha": 0.25,
-        "rpn_loss_cls_weight": 1.0,
-        "rpn_loss_bbox_weight": 1.0,
-        "ga_scales_per_octave": 3,
-        "ga_approx_ratios": [0.5, 1.0, 2.0],
-        "ga_loc_filter_thr": 0.01,
-        "ga_allowed_border": -1,
-        "ga_center_ratio": 0.2,
-        "ga_ignore_ratio": 0.5,
-        "ga_anchor_target_stds": [0.07, 0.07, 0.14, 0.14],
-        "ga_bbox_target_stds": [0.07, 0.07, 0.11, 0.11],
-        "roi_featmap_strides": [4, 8, 16, 32],
-        "bbox_roi_extractor_type": "SingleRoIExtractor",
-        "mask_roi_extractor_type": "SingleRoIExtractor",
-        "roi_layer_type": "RoIAlign",
-        "roi_aggregation": "sum",
-        "roi_sampling_ratio": 0,
-        "freeze_stages": 0,
-        "cascade_iou_thresholds": [0.5, 0.6, 0.7],
-        "cascade_stage_weights": [1.0, 0.5, 0.25],
-        "cascade_target_stds": [
-            [0.1, 0.1, 0.2, 0.2],
-            [0.05, 0.05, 0.1, 0.1],
-            [0.033, 0.033, 0.067, 0.067],
-        ],
-        "reg_class_agnostic": True,
-        "mask_size": 28,
-        "bbox_head_type": "Shared2FCBBoxHead",
-        "bbox_loss_cls_type": "CrossEntropyLoss",
-        "bbox_focal_gamma": 2.0,
-        "bbox_focal_alpha": 0.25,
-        "bbox_loss_cls_weight": 1.0,
-        "bbox_loss_type": "SmoothL1Loss",
-        "bbox_loss_weight": 1.0,
-        "bbox_smooth_l1_beta": 1.0,
-        "bbox_balanced_l1_alpha": 0.5,
-        "bbox_balanced_l1_gamma": 1.5,
-        "bbox_balanced_l1_beta": 1.0,
-        "bbox_reg_decoded_bbox": False,
-        "bbox_num_shared_convs": 2,
-        "bbox_num_shared_fcs": 1,
-        "bbox_num_convs": 4,
-        "bbox_num_fcs": 2,
-        "bbox_conv_out_channels": 256,
-        "anchor_scale": 8,
-        "anchor_ratios": [0.5, 1.0, 2.0],
-        "rpn_pos_iou_thr": 0.7,
-        "rpn_neg_iou_thr": 0.3,
-        "rpn_batch_size": 256,
-        "rpn_positive_fraction": 0.5,
-        "rpn_assigner_type": "MaxIoUAssigner",
-        "rpn_atss_topk": 9,
-        "rpn_sampler_type": "RandomSampler",
-        "rpn_pos_sampler_type": "InstanceBalancedPosSampler",
-        "rpn_neg_sampler_type": "IoUBalancedNegSampler",
-        "rpn_iou_balanced_floor_thr": -1,
-        "rpn_iou_balanced_floor_fraction": 0,
-        "rpn_iou_balanced_num_bins": 3,
-        "rpn_allowed_border": 0,
-        "rpn_nms_thresh": 0.7,
-        "rpn_pre_nms_train": 2000,
-        "rpn_post_nms_train": 2000,
-        "rpn_pre_nms_test": 1000,
-        "rpn_post_nms_test": 1000,
-        "roi_out_size_bbox": 7,
-        "roi_out_size_mask": 14,
-        "fc_out_channels": 1024,
-        "mask_head_type": "FCNMaskHead",
-        "mask_num_convs": 4,
-        "mask_class_agnostic": False,
-        "mask_conv_to_res": True,
-        "mask_dice_loss_weight": 1.0,
-        "mask_ce_loss_weight": 1.0,
-        "rcnn_batch_size": 512,
-        "rcnn_positive_fraction": 0.25,
-        "rcnn_sampler_type": "RandomSampler",
-        "rcnn_pos_sampler_type": "InstanceBalancedPosSampler",
-        "rcnn_neg_sampler_type": "IoUBalancedNegSampler",
-        "rcnn_iou_balanced_floor_thr": -1,
-        "rcnn_iou_balanced_floor_fraction": 0,
-        "rcnn_iou_balanced_num_bins": 3,
-        "rcnn_ohem_loss_key": "loss_cls",
-        "img_scale": 1024,
-        "multiscale": True,
-        "resize_ratio_min": 0.5,
-        "resize_ratio_max": 2.0,
-        "crop_size_h": 1024,
-        "crop_size_w": 1024,
-        "horizontal_flip": True,
-        "vertical_flip": True,
-        "hflip_prob": 0.5,
-        "vflip_prob": 0.5,
-        "pad_val": 114,
-        "color_jitter": False,
-        "rotate90": False,
-        "elastic": False,
-        "copy_paste": False,
-        "copy_paste_prob": 0.5,
-        "filter_empty_gt": True,
-        "min_size": 32,
-        "min_gt_bbox_wh": [1, 1],
-        "wandb_project": "none",
-        "run_start_time": None,
-        "training_artifacts": True,
-        "artifact_dir_name": "analysis",
-        "artifact_interval": 1,
-        "artifact_num_visualizations": 6,
-        "artifact_seed": 42,
-        "artifact_score_threshold": 0.05,
-        "artifact_draw_score_threshold": 0.3,
-        "artifact_mask_iou_threshold": 0.5,
-    }
-    for key, default in defaults.items():
-        if getattr(args, key, None) is None:
-            setattr(args, key, cfg.get(key, default))
+    populate_runtime_args(args, cfg, TRAIN_FALLBACKS)
 
     if args.run_start_time is None:
         args.run_start_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return args
 
+
+def main():
+    args = hydrate_training_args(make_training_parser().parse_args())
     cfg_str = json.dumps(dict(vars(args)), indent=2, default=str)
     print(f"Config: {cfg_str}")
     train_with_runner(args)
+
+
+if __name__ == "__main__":
+    main()
