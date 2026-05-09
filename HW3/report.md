@@ -124,50 +124,36 @@ The backbone uses a 0.1× LR multiplier to avoid disrupting ImageNet pre-trained
 
 ### 3.2 Training Curves
 
-![Training Loss Curve](figures/training_loss_curve.png)
+<img src="figures/training_curves.png" width="700">
 
-*Figure 1: Training loss curve over epochs. Includes RPN loss, cls/bbox loss for each Cascade stage, and mask loss.*
+*Figure 1: Training loss (left) and validation segm mAP@50 (right) curves over epochs.*
 
-![Validation mAP Curve](figures/validation_map_curve.png)
-
-*Figure 2: Validation segm_mAP_50 curve over epochs. The model's mAP rapidly improves during the first 5 epochs of warmup, then steadily converges under the cosine annealing schedule.*
+The left plot shows that training loss drops rapidly from ~5.2 to ~2.3 during the first 2 epochs of linear warmup, then steadily decreases to ~0.83 by epoch 50. The right plot shows that validation mAP@50 surges between epochs 5–10 (from near 0 to ~0.63), then gradually converges to the 0.69–0.72 range under the cosine annealing schedule after epoch 20. The best mAP@50 = 0.724 was achieved around epoch 25.
 
 ### 3.3 Confusion Matrix
 
-![Confusion Matrix](figures/confusion_matrix.png)
+<img src="figures/confusion_matrix.png" width="450">
 
-*Figure 3: Confusion matrix for the 4 cell types. Percentages indicate the proportion of each ground truth class predicted as each category.*
+*Figure 2: Confusion matrix on the validation set (4 cell types + background). Numbers represent instance counts at IoU ≥ 0.5.*
 
-![Per-Class AP](figures/per_class_ap.png)
+The diagonal values show that the model correctly matches the majority of instances for all 4 classes: class1 (572/873, 65.5%), class2 (1080/1816, 59.5%), class3 (80/85, 94.1%), class4 (44/66, 66.7%). The dominant error type is missed detections (GT → bg column): class2 has the highest miss count (694), followed by class1 (272). Inter-class confusion is relatively low — the main misclassifications occur between class1 ↔ class2 (29 class1 predicted as class2, 39 class2 predicted as class1), because these two cell types share similar morphological features. The bg → predicted row shows 427 false positive predictions in total, with class2 accounting for the most (215). Class3 has the highest recall (94.1%), likely because its appearance is the most distinctive among all cell types.
 
-*Figure 4: AP50 scores for each class. Differences in detection difficulty across cell types can be observed.*
+### 3.4 Ground Truth vs. Prediction Comparison
 
-### 3.4 Prediction Visualization
+<img src="figures/contact_sheet.png" width="600">
 
-| Image | Description |
-|-------|-------------|
-| ![Pred 1](figures/pred_vis_1.png) | Typical multi-cell scene where the model successfully segments all instances |
-| ![Pred 2](figures/pred_vis_2.png) | Image containing cells of varying sizes, demonstrating multi-scale detection capability |
-| ![Pred 3](figures/pred_vis_3.png) | High-density cell region, testing the model's ability to segment overlapping objects |
+*Figure 3: GT (left half) vs. Prediction (right half) comparison for 6 validation images. Different colors represent different cell classes.*
 
-*Figure 5: Prediction visualization. Different colors represent different cell types, with masks overlaid on the original images.*
+This contact sheet presents 6 representative validation images covering a variety of scenarios:
 
-### 3.5 Ground Truth vs. Prediction Comparison
+- **Top-left**: High-density scene with many small class1 cells (green). The model successfully detects and segments most instances, but a few tightly clustered cells are missed.
+- **Top-right**: Sparse scene with mixed cell types (blue/purple). The model accurately segments well-separated cells with clean mask boundaries.
+- **Middle-left**: Large class3 cells (pink/magenta) with distinctive morphological features. The model produces high-quality segmentation results, consistent with class3's highest recall (94.1%) in the confusion matrix.
+- **Middle-right**: Extremely high-density scene dominated by class1 cells (orange). In severely overlapping regions, some instances are merged or missed — this is the model's primary failure mode.
+- **Bottom-left**: Cells of mixed sizes (blue/green), demonstrating the model's multi-scale detection capability — both large and small cells are correctly segmented.
+- **Bottom-right**: Large cells with clear boundaries (pink). The model's masks precisely match the ground truth contours.
 
-| Ground Truth | Prediction |
-|:---:|:---:|
-| ![GT 1](figures/gt_vs_pred_gt_1.png) | ![Pred 1](figures/gt_vs_pred_pred_1.png) |
-| ![GT 2](figures/gt_vs_pred_gt_2.png) | ![Pred 2](figures/gt_vs_pred_pred_2.png) |
-
-*Figure 6: Comparison between Ground Truth and model predictions. The model's performance in mask boundary precision and classification correctness can be observed.*
-
-### 3.6 Failure Case Analysis
-
-![Failure Cases](figures/failure_cases.png)
-
-*Figure 7: Model failure case analysis. Common failure modes include: (1) extremely overlapping cells merged into a single instance; (2) imprecise masks at blurry boundaries; (3) missed detections for extremely small cells.*
-
-### 3.7 Cumulative Improvement History
+### 3.5 Cumulative Improvement History
 
 The following table records the step-by-step improvements from baseline to the final model:
 
